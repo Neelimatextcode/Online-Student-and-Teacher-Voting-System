@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student & Teacher Voting System</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    * { transition: all 0.3s ease-in-out; }
+    body { font-family: Arial; margin: 0; background: url("SCHOOL_BUILDING_NEW.jpg") no-repeat center center fixed; background-size: cover; }
+    .navbar { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to right, #001f4d, #ffffff); padding: 10px 20px; }
+    .navbar img { height: 60px; }
+    .center-logo { height: 50px; }
+    .school-name {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      line-height: 1.3;
+    }
+    .school-name .blue { color: #00B0F0; }
+    .school-name .red { color: #FF4136; }
+    .section { display: none; padding: 20px; }
+    .active { display: block; }
+    .input-group, .candidate-grid { text-align: center; margin-top: 20px; }
+    input, select, button {
+      padding: 10px;
+      font-size: 16px;
+      margin: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button { background-color: #001f4d; color: white; cursor: pointer; }
+    button:hover { background-color: #004080; transform: scale(1.05); }
+    .candidate-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
+    .candidate-card {
+      width: 160px;
+      background: white;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+      text-align: center;
+      padding: 10px;
+      cursor: pointer;
+    }
+    .candidate-card img { width: 100%; height: 150px; object-fit: cover; border-radius: 10px; }
+    .candidate-card.selected { border-color: green; background: #e0ffe0; }
+    .review-entry { display: flex; align-items: center; margin-bottom: 10px; gap: 10px; }
+    .review-entry img { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid #ccc; }
+    #thankyouPage { text-align: center; font-size: 24px; padding: 50px; }
+  </style>
+</head>
+<body onload="showSection('welcomePage')">
+  <div class="navbar">
+    <img src="SCTS_MSP LOGO.jpg" alt="School Logo">
+    <div class="school-name">
+      <span class="blue">SRI CHAITANYA</span> <span class="red">TECHNO CURRICULUM</span><br>
+      <strong style="font-size:20px;">STUDENT COUNCIL ELECTIONS 2025‑2026</strong>
+    </div>
+    <img src="INFINITY_META_40yrs_ExcellenceLOGO.jpg" class="center-logo" alt="Infinity Learn Logo">
+  </div>
+
+  <div class="section active" id="welcomePage">
+    <h2 style="text-align:center;">Welcome to the Online Voting System</h2>
+    <div class="input-group">
+      <button onclick="setupVoter('student')">Student Vote 👩‍🎓</button>
+      <button onclick="setupVoter('teacher')">Teacher Vote 👩‍🏫</button>
+      <button onclick="showSection('adminPage')">Admin Panel</button>
+    </div>
+  </div>
+
+  <div class="section" id="voterForm">
+    <h2 style="text-align:center;">Enter Your Details</h2>
+    <div class="input-group">
+      <input id="voterName" placeholder="Name">
+      <input id="voterClass" placeholder="Class/Subject">
+      <input id="voterID" placeholder="SCS Number">
+      <select id="voterGroup">
+        <option value="">Select Your House</option>
+        <option value="Spartans">Spartans</option>
+        <option value="Vikings">Vikings</option>
+        <option value="Samurais">Samurais</option>
+        <option value="Knights">Knights</option>
+      </select>
+      <button onclick="startVoting()">Start Voting</button>
+    </div>
+  </div>
+
+  <div class="section" id="votingPage">
+    <h2 id="roleTitle" style="text-align:center;"></h2>
+    <div class="candidate-grid" id="candidateOptions"></div>
+    <div class="input-group"><button onclick="nextRole()">Next</button></div>
+  </div>
+
+  <div class="section" id="reviewPage">
+    <h2 style="text-align:center;">Review Your Selections</h2>
+    <div id="reviewList"></div>
+    <div class="input-group">
+      <button onclick="confirmSubmission()">✅ Confirm Vote</button>
+      <button onclick="window.print()">🖨️ Print Review</button>
+    </div>
+  </div>
+
+  <div class="section" id="thankyouPage">
+    <h2>🎉 Thank You for Voting!</h2>
+    <p>Your votes have been recorded successfully.</p>
+    <button onclick="showSection('welcomePage')">Back to Home</button>
+  </div>
+
+  <div class="section" id="adminPage">
+    <h2 style="text-align:center;">Admin Panel</h2>
+    <div class="input-group">
+      <button onclick="downloadExcel()">Download All (Excel)</button>
+      <button onclick="downloadTeacherExcel()">Download Teacher Only</button>
+      <button onclick="downloadStudentExcel()">Download Student Only</button>
+      <button onclick="resetVotes()">🗑️ Reset All Votes</button>
+      <button onclick="showSection('welcomePage')">Back</button>
+    </div>
+  </div>
+
+<script>
+let voteData={}, voterType='', voterInfo={}, allVotes = JSON.parse(localStorage.getItem("allVotes")) || {student:[],teacher:[]};
+const allRoles=[
+  {role:"Head Boy",candidates:["headboy_eshanth_reddy.jpg","headboy_nakul.jpg","headboy_sourasish_sadhu.jpg","headboy_divyatej.jpg"]},
+  {role:"Head Girl",candidates:["headgirl_kavya_s.jpg","headgirl_sanvi_sah.jpg","headgirl_sinchana.jpg"]},
+  {role:"Deputy Head Boy",candidates:["dhb_dhruva_khot.jpg","dhb_rohit_narayan.jpg","dhb_karthikeya_d.jpg","dhb_jishnu_s.jpg"]},
+  {role:"Deputy Head Girl",candidates:["dhg_dhruvika_k.jpg","dhg_mahi_m.jpg","dhg_jenita_k_gowda.jpg","dhg_chetana_e_l.jpg"]},
+  {role:"CCA Captain",candidates:["cca_Ganvi_c.jpg","cca_ahalya_a.jpg","cca_ramya_k.jpg","cca_smruti_kulkarni.jpg"]},
+  {role:"Sports Captain",candidates:["sports_lakshit_j_r.jpg","sports_mithun_d.jpg"]},
+  {role:"Spartans Captain",candidates:["spartans_tejaswini_m.jpg","spartans_johanna_gipson.jpg","spartans_sathvik_kumar.jpg","spartans_chandan_patel.jpg"]},
+  {role:"Spartans Deputy Captain",candidates:["spartans_deputy_manya_k.jpg","spartans_deputy_mithun_n.jpg"]},
+  {role:"Samurais Captain",candidates:["samurai_gagan_reddy.jpg","samurai_manha_shaik.jpg","samurai_tameem_tabassum.jpg"]},
+  {role:"Samurais Deputy Captain",candidates:["samurai_deputy_hima_urs.jpg","samurai_steve_bino.jpg","samurai_deputy_gagan_gowda.jpg","samurai_deputy_vishnu_priya.jpg"]},
+  {role:"Vikings Captain",candidates:["vikings_shublaksh_thygi.jpg","vikings_ke ndik,kumar","vikings_kruthik_s.jpg","vikings_krishnatulasi.jpg","vikings_preksha_s.jpg"]},
+  {role:"Vikings Deputy Captain",candidates:["vikings_deputy_ullas_p.jpg","vikings_deputy_akhilesha.jpg","vikings_deputy_joanna_rai.jpg","vikings_deputy_likith_n.jpg","vikings_deputy_rashi_r.jpg"]},
+  {role:"Knights Captain",candidates:["knights_subiya_fathima.jpg","knights_chetan_patel.jpg","knights_saanvi_c_patel.jpg"]},
+  {role:"Knights Deputy Captain",candidates:["knights_deputy_pranav_shiggaon.jpg","knights_deputy_sricharan_budigi.jpg","knights_deputy_mia_merin.jpg","knights_deputy_shaarvi_k.jpg"]}
+];
+let roles=[], currentRoleIndex=0;
+
+function showSection(id){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function setupVoter(type){voterType=type;voteData={};voterInfo={};currentRoleIndex=0;showSection('voterForm');}
+function startVoting(){
+  const name=document.getElementById('voterName').value.trim();
+  const cls=document.getElementById('voterClass').value.trim();
+  const id=document.getElementById('voterID').value.trim();
+  const house=document.getElementById('voterGroup').value;
+  if(!name||!cls||!id||!house){alert("Fill all fields.");return;}
+  voterInfo={name,class_or_subject:cls,id,house};
+  const hl=house.toLowerCase();
+  roles=allRoles.filter(r=>{
+    if(r.role.includes("Captain")&&!r.role.includes("CCA")&&!r.role.includes("Sports")){
+      return r.role.toLowerCase().includes(hl);
+    }
+    return true;
+  });
+  showRole();showSection('votingPage');
+}
+function showRole(){
+  const role=roles[currentRoleIndex];
+  document.getElementById('roleTitle').innerText=`Vote for ${role.role}`;
+  const grid=document.getElementById('candidateOptions');
+  grid.innerHTML='';
+  role.candidates.forEach(img=>{
+    const name=img.split('_').slice(1).join(' ').replace('.jpg','').replace(/\b\w/g,l=>l.toUpperCase());
+    const card=document.createElement('div');card.className='candidate-card';
+    card.innerHTML=`<img src="${img}" alt="${name}"><p>${name}</p>`;
+    card.onclick=()=>{
+      document.querySelectorAll('.candidate-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+      voteData[role.role]={name,img};
+    };
+    grid.appendChild(card);
+  });
+}
+function nextRole(){
+  if(!voteData[roles[currentRoleIndex].role]){alert("Select a candidate.");return;}
+  currentRoleIndex++;currentRoleIndex<roles.length?showRole():showReview();
+}
+function showReview(){
+  const rc=document.getElementById('reviewList');rc.innerHTML='';
+  for(const r in voteData){
+    const v=voteData[r];
+    const div=document.createElement('div');div.className='review-entry';
+    div.innerHTML=`<img src="${v.img}" alt="${v.name}"><div><strong>${r}</strong><br>${v.name}</div>`;
+    rc.appendChild(div);
+  }
+  showSection('reviewPage');
+}
+function confirmSubmission(){
+  const fv={...voterInfo};
+  for(const r in voteData)fv[r]=voteData[r].name;
+  allVotes[voterType].push(fv);
+  localStorage.setItem("allVotes",JSON.stringify(allVotes));
+  showSection('thankyouPage');
+}
+function downloadExcel(){
+  const wb=XLSX.utils.book_new();
+  ['student','teacher'].forEach(t=>{if(allVotes[t].length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(allVotes[t]),`${t.charAt(0).toUpperCase()+t.slice(1)} Votes`);});
+  XLSX.writeFile(wb,"Complete_Election_Results.xlsx");
+}
+function downloadTeacherExcel(){
+  const d=allVotes.teacher;if(d.length){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(d),"Teacher Votes");XLSX.writeFile(wb,"Teacher_Election_Results.xlsx");}else alert("No teacher votes.");
+}
+function downloadStudentExcel(){
+  const d=allVotes.student;if(d.length){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(d),"Student Votes");XLSX.writeFile(wb,"Student_Election_Results.xlsx");}else alert("No student votes.");
+}
+function resetVotes(){
+  if(confirm("Are you sure you want to delete all votes? This cannot be undone.")) {
+    localStorage.removeItem("allVotes");
+    allVotes={student:[],teacher:[]};
+    alert("All votes have been reset.");
+  }
+}
+</script>
+</body>
+</html>
